@@ -1,576 +1,756 @@
-:root {
-  --color-bg: #FFF6EC;
-  --color-bg-soft: #FFEDDA;
-  --color-coral: #FF8A65;
-  --color-coral-dark: #F16A45;
-  --color-yellow: #FFC857;
-  --color-yellow-dark: #E8AC2E;
-  --color-line: #3A2E28;
-  --color-white: #FFFFFF;
-  --radius-lg: 24px;
-  --radius-md: 16px;
-  --radius-sm: 10px;
-  --shadow-soft: 0 6px 18px rgba(180, 110, 70, 0.15);
+import { useEffect, useRef, useState, useCallback } from 'react'
+
+/* ========================================================================
+ * えいご（キャラクターが はなす／こたえる れんしゅう）
+ * きょうざい：Lesson 1〜3 の たんごと フレーズ
+ * ==================================================================== */
+
+// れっすん ごとの たんご・しつもん・こたえの ぶん（きょうざいの ページに あわせて ふやせます）
+const LESSONS = [
+  {
+    id: 'l1',
+    title: 'れっすん 1',
+    intro: { en: "Let's meet my friends!", ja: 'ともだちを しょうかいするよ！' },
+    q: "What's he?",
+    qJa: 'このこは なにかな？',
+    a: (w) => `He's a ${w.en}.`,
+    aJa: (w) => `「${w.ja}」だよ！`,
+    blank: "He's a ＿＿＿.",
+    words: [
+      { id: 'dinosaur', en: 'dinosaur', ja: 'きょうりゅう', emoji: '🦖', mood: 'happy' },
+      { id: 'rabbit', en: 'rabbit', ja: 'うさぎ', emoji: '🐰', mood: 'happy' },
+      { id: 'superhero', en: 'superhero', ja: 'すーぱーひーろー', emoji: '🦸', mood: 'happy' },
+      { id: 'unicorn', en: 'unicorn', ja: 'ゆにこーん', emoji: '🦄', mood: 'happy' },
+    ],
+  },
+  {
+    id: 'l2',
+    title: 'れっすん 2',
+    intro: { en: "Let's get some snacks!", ja: 'おやつを もらおう！' },
+    q: 'What do you want?',
+    qJa: 'なにが ほしい？',
+    a: (w) => `I want some ${w.en}.`,
+    aJa: (w) => `「${w.ja}」が ほしいな！`,
+    blank: 'I want some ＿＿＿.',
+    words: [
+      { id: 'fries', en: 'French fries', ja: 'ふらいどぽてと', emoji: '🍟', mood: 'happy' },
+      { id: 'gummy', en: 'gummy bears', ja: 'ぐみ', emoji: '🍬', mood: 'happy' },
+      { id: 'kale', en: 'kale chips', ja: 'けーるの ちっぷす', emoji: '🥬', mood: 'happy' },
+      { id: 'pickles', en: 'pickles', ja: 'ぴくるす', emoji: '🥒', mood: 'happy' },
+    ],
+  },
+  {
+    id: 'l3',
+    title: 'れっすん 3',
+    intro: { en: "Let's try snacks!", ja: 'おやつを たべて みよう！' },
+    q: 'How are they?',
+    qJa: 'どうかな？',
+    a: (w) => `They're ${w.en}.`,
+    aJa: (w) => `「${w.ja}」！`,
+    blank: "They're ＿＿＿.",
+    words: [
+      { id: 'bitter', en: 'bitter', ja: 'にがい', emoji: '🍫', mood: 'bitter' },
+      { id: 'salty', en: 'salty', ja: 'しょっぱい', emoji: '🥨', mood: 'salty' },
+      { id: 'sour', en: 'sour', ja: 'すっぱい', emoji: '🍋', mood: 'sour' },
+      { id: 'sweet', en: 'sweet', ja: 'あまい', emoji: '🍪', mood: 'sweet' },
+    ],
+  },
+]
+const ALL_WORD_IDS = LESSONS.flatMap((l) => l.words.map((w) => w.id))
+
+// こどもの はつおんが すこし ずれても よみとれるように、ききまちがいやすい ことばも ゆるす
+const HOMOPHONES = {
+  dinosaur: ['dinosaur', 'dinosaurs', 'dino', 'dinosour', 'dinosaw'],
+  rabbit: ['rabbit', 'rabbits', 'rabbet', 'rabbi it'],
+  superhero: ['superhero', 'super hero', 'superheroes', 'super heroes', 'superheros'],
+  unicorn: ['unicorn', 'unicorns', 'uni corn', 'you need corn'],
+  fries: ['french fries', 'french fry', 'french fried', 'fries', 'french freeze'],
+  gummy: ['gummy bears', 'gummy bear', 'gummy', 'gummies', 'gummi bears', 'gummy bares'],
+  kale: ['kale chips', 'kale chip', 'kale', 'kail', 'kayle', 'cale chips', 'kale ships'],
+  pickles: ['pickles', 'pickle', 'pickled', 'pickels'],
+  bitter: ['bitter', 'better', 'bidder', 'biter'],
+  salty: ['salty', 'salt', 'saltie', 'salti', 'sultry', 'solty'],
+  sour: ['sour', 'sower', 'sauer', 'saw', 'sawyer', 'power'],
+  sweet: ['sweet', 'suite', 'sweat', 'sweetie'],
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html, body {
-  margin: 0;
-  padding: 0;
-  background: var(--color-bg);
-  color: #000000;
-  font-family: "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN W4", "Hiragino Sans", sans-serif;
-  -webkit-tap-highlight-color: transparent;
-  overscroll-behavior-y: none;
-}
-
-#root {
-  min-height: 100dvh;
-  display: flex;
-  justify-content: center;
-}
-
-.app-shell {
-  width: 100%;
-  max-width: 720px;
-  min-height: 100dvh;
-  padding: env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.app-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 18px 4px 4px;
-}
-
-.app-header .logo-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-coral), var(--color-yellow));
-  flex-shrink: 0;
-}
-
-.app-header h1 {
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0;
-  letter-spacing: 0.02em;
-}
-
-.card {
-  background: var(--color-white);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.section-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--color-coral-dark);
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.button-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-button {
-  font-family: inherit;
-  border: none;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.btn-primary {
-  background: var(--color-coral);
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 15px;
-  padding: 14px 20px;
-  border-radius: var(--radius-md);
-  flex: 1;
-  min-width: 130px;
-  transition: transform 0.15s ease, background 0.15s ease;
-}
-.btn-primary:active {
-  transform: scale(0.97);
-  background: var(--color-coral-dark);
-}
-.btn-primary:disabled {
-  background: #E9D9CC;
-  color: #ffffff;
-  cursor: default;
-}
-
-.btn-secondary {
-  background: var(--color-bg-soft);
-  color: #000000;
-  font-weight: 700;
-  font-size: 15px;
-  padding: 14px 20px;
-  border-radius: var(--radius-md);
-  flex: 1;
-  min-width: 130px;
-  transition: transform 0.15s ease, background 0.15s ease;
-}
-.btn-secondary:active {
-  transform: scale(0.97);
-  background: #FBE0C4;
-}
-
-.btn-yellow {
-  background: var(--color-yellow);
-  color: #000000;
-  font-weight: 700;
-  font-size: 15px;
-  padding: 14px 20px;
-  border-radius: var(--radius-md);
-  flex: 1;
-  min-width: 130px;
-  transition: transform 0.15s ease, background 0.15s ease;
-}
-.btn-yellow:active {
-  transform: scale(0.97);
-  background: var(--color-yellow-dark);
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--color-coral-dark);
-  font-weight: 700;
-  font-size: 14px;
-  padding: 10px 14px;
-  border-radius: var(--radius-sm);
-  border: 2px solid var(--color-coral);
-}
-
-.hint-text {
-  font-size: 13px;
-  color: #7A6B60;
-  line-height: 1.6;
-  margin: 0;
-}
-
-.image-viewport {
-  width: 100%;
-  max-height: 60vh;
-  overflow: auto;
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(45deg, #f2e7da 25%, transparent 25%) -8px 0/16px 16px,
-    linear-gradient(-45deg, #f2e7da 25%, transparent 25%) -8px 0/16px 16px,
-    linear-gradient(45deg, transparent 75%, #f2e7da 75%) 0 0/16px 16px,
-    linear-gradient(-45deg, transparent 75%, #f2e7da 75%) 0 0/16px 16px,
-    #fffdfa;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  touch-action: pan-x pan-y pinch-zoom;
-  position: relative;
-}
-
-.image-viewport img,
-.image-viewport canvas {
-  display: block;
-  max-width: none;
-}
-
-.toggle-row {
-  display: flex;
-  background: var(--color-bg-soft);
-  border-radius: 999px;
-  padding: 4px;
-  gap: 4px;
-}
-
-.toggle-row button {
-  flex: 1;
-  padding: 10px 12px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 700;
-  background: transparent;
-  color: #8a7263;
-}
-
-.toggle-row button.active {
-  background: var(--color-coral);
-  color: #ffffff;
-}
-
-.slider-block {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.slider-block label {
-  font-size: 13px;
-  font-weight: 700;
-  display: flex;
-  justify-content: space-between;
-}
-
-input[type="range"] {
-  width: 100%;
-  accent-color: var(--color-coral);
-}
-
-.palette-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.swatch {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 3px solid transparent;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-  flex-shrink: 0;
-}
-
-.swatch.active {
-  border-color: var(--color-line);
-  transform: scale(1.1);
-}
-
-.tool-row {
-  display: flex;
-  gap: 10px;
-}
-
-.tool-btn {
-  flex: 1;
-  padding: 12px;
-  border-radius: var(--radius-md);
-  background: var(--color-bg-soft);
-  font-size: 13px;
-  font-weight: 700;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.tool-btn.active {
-  background: var(--color-yellow);
-}
-
-.camera-overlay {
-  position: fixed;
-  inset: 0;
-  background: #1c1310;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom));
-}
-
-.camera-overlay video {
-  width: 100%;
-  max-width: 600px;
-  border-radius: var(--radius-lg);
-  background: #000;
-}
-
-.camera-shutter {
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 6px solid var(--color-coral);
-}
-
-.step-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--color-yellow);
-  font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.loading-note {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-coral-dark);
-  text-align: center;
-}
-
-.thumb-preview {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  width: 64px;
-  height: 64px;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  border: 3px solid #ffffff;
-  box-shadow: var(--shadow-soft);
-}
-
-.thumb-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-@media (min-width: 700px) {
-  .app-shell {
-    max-width: 820px;
-    padding-top: 12px;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const shuffle = (arr) => {
+  const a = arr.slice()
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
   }
-  .card {
-    padding: 24px;
+  return a
+}
+
+// こえの せってい（EigoApp から かきかえる）
+const PREFS = { voiceURI: '', rate: 0.65 }
+const MALE_RE = /\b(aaron|alex|fred|daniel|evan|tom|arthur|oliver|gordon|rishi|reed|ralph|junior|male)\b/i
+
+function pickVoice(voices) {
+  if (PREFS.voiceURI) {
+    const chosen = voices.find((v) => v.voiceURI === PREFS.voiceURI)
+    if (chosen) return chosen
   }
+  const en = voices.filter((v) => /^en/i.test(v.lang))
+  const males = en.filter((v) => MALE_RE.test(v.name))
+  return (
+    males.find((v) => /^en[-_]US/i.test(v.lang)) ||
+    males[0] ||
+    en.find((v) => /^en[-_]US/i.test(v.lang)) ||
+    en[0] ||
+    null
+  )
 }
 
-/* ===== したの タブ ===== */
-.app-shell {
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+function speakEn(text, opts = {}) {
+  return new Promise((resolve) => {
+    if (!('speechSynthesis' in window)) {
+      setTimeout(resolve, Math.max(1200, text.length * 90))
+      return
+    }
+    const synth = window.speechSynthesis
+    synth.cancel()
+    const u = new SpeechSynthesisUtterance(text)
+    u.lang = 'en-US'
+    u.rate = opts.rate ?? PREFS.rate
+    const v = pickVoice(synth.getVoices())
+    if (v) {
+      u.voice = v
+      u.lang = v.lang
+    }
+    // おとこの ひとの こえは すこし たかく して、おとこの こらしく する
+    u.pitch = v && MALE_RE.test(v.name) ? 1.45 : 1.2
+    let done = false
+    let timer = null
+    const finish = () => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      resolve()
+    }
+    timer = setTimeout(finish, text.length * 200 + 2500)
+    u.onstart = () => opts.onStart && opts.onStart()
+    u.onend = finish
+    u.onerror = finish
+    synth.speak(u)
+  })
 }
 
-.tab-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-  background: rgba(255, 246, 236, 0.96);
-  backdrop-filter: blur(8px);
-  border-top: 2px solid var(--color-bg-soft);
-  z-index: 40;
+function matchesWord(alts, w) {
+  const targets = HOMOPHONES[w.id] || [w.en.toLowerCase()]
+  return alts.some((alt) => {
+    const text = ` ${alt.toLowerCase().replace(/[^a-z\s']/g, ' ').replace(/\s+/g, ' ').trim()} `
+    return targets.some((t) => text.includes(` ${t} `))
+  })
 }
 
-.tab-bar button {
-  flex: 1;
-  max-width: 260px;
-  padding: 13px;
-  border-radius: 999px;
-  font-size: 16px;
-  font-weight: 700;
-  background: var(--color-bg-soft);
-  color: #000000;
+function buildStory(lesson, words) {
+  return [
+    { en: "Hello! I'm Dino!", ja: 'こんにちは！ ぼく でぃのだよ', mood: 'happy' },
+    { ...lesson.intro, mood: 'normal' },
+    ...words.flatMap((w) => [
+      { en: lesson.q, ja: lesson.qJa, mood: 'ask', emoji: w.emoji },
+      { en: lesson.a(w), ja: lesson.aJa(w), mood: w.mood, emoji: w.emoji },
+      { en: w.en, ja: `「${w.ja}」の ことだよ`, mood: w.mood, emoji: w.emoji },
+    ]),
+    { en: "Great! Now it's your turn!", ja: 'じょうずだね！ こんどは きみの ばんだよ', mood: 'cheer' },
+  ]
 }
 
-.tab-bar button.active {
-  background: var(--color-coral);
-  color: #ffffff;
+// かわいい きょうりゅう キャラクター（SVG・オリジナル）
+function Dino({ mood = 'normal', talking = false }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!talking) {
+      setOpen(false)
+      return undefined
+    }
+    const id = setInterval(() => setOpen((o) => !o), 150)
+    return () => clearInterval(id)
+  }, [talking])
+
+  const happyEyes = mood === 'happy' || mood === 'sweet' || mood === 'cheer'
+  const squeezeEyes = mood === 'sour' || mood === 'salty'
+  const sadEyes = mood === 'bitter'
+
+  let mouth
+  if (open) {
+    mouth = (
+      <g>
+        <ellipse cx="120" cy="128" rx="16" ry="11" fill="#5A2A2A" />
+        <ellipse cx="120" cy="134" rx="9" ry="5" fill="#FF8A8A" />
+      </g>
+    )
+  } else if (mood === 'sour') {
+    mouth = <circle cx="120" cy="127" r="6" fill="#5A2A2A" />
+  } else if (mood === 'bitter') {
+    mouth = <path d="M104 134 Q120 118 136 134" stroke="#000" strokeWidth="4" fill="none" strokeLinecap="round" />
+  } else if (mood === 'salty') {
+    mouth = (
+      <g>
+        <path d="M114 126 Q114 146 124 146 Q131 146 131 126 Z" fill="#FF8A8A" />
+        <path d="M104 124 Q120 132 136 124" stroke="#000" strokeWidth="4" fill="none" strokeLinecap="round" />
+      </g>
+    )
+  } else {
+    mouth = <path d="M104 120 Q120 138 136 120" stroke="#000" strokeWidth="4" fill="none" strokeLinecap="round" />
+  }
+
+  const eye = (cx) => (
+    <g>
+      <circle cx={cx} cy="92" r="11" fill="#fff" />
+      <circle cx={cx} cy="93" r="6" fill="#000" />
+      <circle cx={cx + 2} cy="90" r="2" fill="#fff" />
+    </g>
+  )
+
+  return (
+    <div className={`dino${talking ? ' dino-talk' : ''}${mood === 'cheer' ? ' dino-cheer' : ''}`}>
+      <svg viewBox="0 0 240 240" role="img" aria-label="でぃの">
+        <path d="M168 170 Q222 178 228 138 Q200 152 166 146 Z" fill="#6DBE63" />
+        <ellipse cx="120" cy="178" rx="60" ry="50" fill="#7BC96F" />
+        <ellipse cx="120" cy="188" rx="36" ry="34" fill="#E3F6CF" />
+        <ellipse cx="92" cy="224" rx="20" ry="11" fill="#6DBE63" />
+        <ellipse cx="148" cy="224" rx="20" ry="11" fill="#6DBE63" />
+        <ellipse cx="66" cy="172" rx="11" ry="17" fill="#6DBE63" transform="rotate(20 66 172)" />
+        <ellipse cx="174" cy="172" rx="11" ry="17" fill="#6DBE63" transform="rotate(-20 174 172)" />
+        <polygon points="80,52 96,22 110,50" fill="#FFC857" />
+        <polygon points="106,44 124,12 142,44" fill="#FF8A65" />
+        <polygon points="136,50 152,22 166,54" fill="#FFC857" />
+        <circle cx="120" cy="100" r="58" fill="#7BC96F" />
+        <circle cx="86" cy="70" r="6" fill="#6DBE63" />
+        <circle cx="150" cy="66" r="5" fill="#6DBE63" />
+        <circle cx="120" cy="62" r="4" fill="#6DBE63" />
+        <circle cx="78" cy="118" r="10" fill="#FF9E9E" opacity="0.75" />
+        <circle cx="162" cy="118" r="10" fill="#FF9E9E" opacity="0.75" />
+        {happyEyes && (
+          <g stroke="#000" strokeWidth="4" fill="none" strokeLinecap="round">
+            <path d="M88 96 Q98 82 108 96" />
+            <path d="M132 96 Q142 82 152 96" />
+          </g>
+        )}
+        {squeezeEyes && (
+          <g stroke="#000" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M88 84 L106 92 L88 100" />
+            <path d="M152 84 L134 92 L152 100" />
+          </g>
+        )}
+        {!happyEyes && !squeezeEyes && (
+          <g>
+            {eye(98)}
+            {eye(142)}
+          </g>
+        )}
+        {sadEyes && (
+          <g stroke="#000" strokeWidth="4" strokeLinecap="round">
+            <path d="M86 78 L108 84" />
+            <path d="M154 78 L132 84" />
+          </g>
+        )}
+        {mouth}
+        {mood === 'sour' && <path d="M184 62 Q192 78 184 84 Q176 78 184 62 Z" fill="#8FD3F4" />}
+        {mood === 'bitter' && (
+          <path d="M176 64 q6 -6 12 0 t12 0" stroke="#8D6E52" strokeWidth="3" fill="none" strokeLinecap="round" />
+        )}
+        {mood === 'sweet' && (
+          <text x="172" y="78" fontSize="28">
+            💗
+          </text>
+        )}
+        {mood === 'cheer' && (
+          <text x="28" y="70" fontSize="28">
+            ⭐
+          </text>
+        )}
+      </svg>
+    </div>
+  )
 }
 
-/* ===== えいご ===== */
-.stage {
-  background: linear-gradient(180deg, #FFE9D2 0%, #FFD9A8 100%);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-  padding: 16px 14px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+export default function App() {
+  const [lessonId, setLessonId] = useState('l1')
+  const [selected, setSelected] = useState(ALL_WORD_IDS)
+  const [sub, setSub] = useState('story')
+  const [mood, setMood] = useState('happy')
+  const [talking, setTalking] = useState(false)
+  const [bubble, setBubble] = useState({ en: '', ja: '「はじめる」を おしてね' })
+  const [emoji, setEmoji] = useState('')
+  const [playing, setPlaying] = useState(false)
+  const [stepInfo, setStepInfo] = useState({ k: -1, n: 0 })
 
-.bubble {
-  background: #ffffff;
-  border: 3px solid var(--color-coral);
-  border-radius: 22px;
-  padding: 12px 16px;
-  text-align: center;
-  min-height: 76px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-}
+  const [answerStyle, setAnswerStyle] = useState('word')
+  const [qOrder, setQOrder] = useState([])
+  const [qIdx, setQIdx] = useState(0)
+  const [qPhase, setQPhase] = useState('idle') // idle | asking | ready | listening | right | wrong | done
+  const [score, setScore] = useState(0)
+  const [heard, setHeard] = useState('')
+  const [hintOn, setHintOn] = useState(false)
+  const [note, setNote] = useState('')
+  const [voices, setVoices] = useState([])
+  const [voiceURI, setVoiceURI] = useState(() => {
+    try {
+      return localStorage.getItem('eigo_voice') || ''
+    } catch (e) {
+      return ''
+    }
+  })
+  const [rate, setRate] = useState(() => {
+    try {
+      return Number(localStorage.getItem('eigo_rate')) || 0.65
+    } catch (e) {
+      return 0.65
+    }
+  })
 
-.bubble-en {
-  font-size: 26px;
-  font-weight: 700;
-  color: #000000;
-}
+  PREFS.voiceURI = voiceURI
+  PREFS.rate = rate
 
-.bubble-blank {
-  color: #b9a79a;
-  font-size: 22px;
-}
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return undefined
+    const synth = window.speechSynthesis
+    const load = () => setVoices(synth.getVoices().filter((v) => /^en/i.test(v.lang)))
+    load()
+    synth.onvoiceschanged = load
+    return () => {
+      synth.onvoiceschanged = null
+    }
+  }, [])
 
-.bubble-ja {
-  font-size: 14px;
-  color: #000000;
-}
+  const changeVoice = (uri) => {
+    setVoiceURI(uri)
+    try {
+      localStorage.setItem('eigo_voice', uri)
+    } catch (e) {
+      /* ignore */
+    }
+  }
+  const changeRate = (r) => {
+    setRate(r)
+    try {
+      localStorage.setItem('eigo_rate', String(r))
+    } catch (e) {
+      /* ignore */
+    }
+  }
 
-.stage-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 6px;
-}
+  const runRef = useRef(0)
+  const recRef = useRef(null)
+  const triesRef = useRef(0)
+  const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null
 
-.dino svg {
-  display: block;
-  width: min(56vw, 250px);
-  height: auto;
-  overflow: visible;
-}
+  const lesson = LESSONS.find((l) => l.id === lessonId)
+  const selectedWords = lesson.words.filter((w) => selected.includes(w.id))
 
-.dino-talk svg {
-  animation: dinoBounce 0.3s ease-in-out infinite alternate;
-}
+  const stopAll = useCallback(() => {
+    runRef.current += 1
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+    if (recRef.current) {
+      try {
+        recRef.current.abort()
+      } catch (e) {
+        /* ignore */
+      }
+      recRef.current = null
+    }
+    setTalking(false)
+    setPlaying(false)
+  }, [])
 
-.dino-cheer svg {
-  animation: dinoJump 0.55s ease-in-out infinite;
-}
+  useEffect(() => () => stopAll(), [stopAll])
 
-.food {
-  width: 104px;
-  height: 104px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: var(--shadow-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 64px;
-  margin-bottom: 18px;
-  animation: foodPop 0.35s ease-out;
-}
+  const say = async (text, { ja = '', mood: m, emoji: em, rate } = {}) => {
+    setBubble({ en: text, ja })
+    if (m) setMood(m)
+    if (em !== undefined) setEmoji(em)
+    await speakEn(text, { rate, onStart: () => setTalking(true) })
+    setTalking(false)
+  }
 
-@keyframes dinoBounce {
-  from { transform: translateY(0); }
-  to { transform: translateY(-6px); }
-}
+  const toggleWord = (id) => {
+    setSelected((cur) => {
+      if (cur.includes(id)) {
+        const remain = cur.filter((x) => x !== id)
+        return lesson.words.some((w) => remain.includes(w.id)) ? remain : cur
+      }
+      return [...cur, id]
+    })
+  }
 
-@keyframes dinoJump {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-16px) rotate(-3deg); }
-}
+  const switchLesson = (id) => {
+    stopAll()
+    setLessonId(id)
+    setMood('happy')
+    setEmoji('')
+    setQPhase('idle')
+    setStepInfo({ k: -1, n: 0 })
+    setNote('')
+    setBubble({ en: '', ja: '「はじめる」を おしてね' })
+  }
 
-@keyframes foodPop {
-  from { transform: scale(0.4); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
+  const switchSub = (s) => {
+    stopAll()
+    setSub(s)
+    setMood('happy')
+    setEmoji('')
+    setQPhase('idle')
+    setNote('')
+    setBubble({ en: '', ja: '「はじめる」を おしてね' })
+  }
 
-.dots {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
+  /* ---------------------------- おはなし ---------------------------- */
 
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--color-bg-soft);
-}
+  const playStory = async () => {
+    stopAll()
+    const id = runRef.current
+    const steps = buildStory(lesson, selectedWords)
+    setPlaying(true)
+    for (let k = 0; k < steps.length; k++) {
+      if (runRef.current !== id) return
+      setStepInfo({ k, n: steps.length })
+      const s = steps[k]
+      await say(s.en, { ja: s.ja, mood: s.mood, emoji: s.emoji })
+      if (runRef.current !== id) return
+      await sleep(350)
+    }
+    if (runRef.current === id) setPlaying(false)
+  }
 
-.dot.on {
-  background: var(--color-yellow);
-}
+  /* ---------------------------- もんだい ---------------------------- */
 
-.word-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
+  const currentWord = qOrder[qIdx]
 
-.word-card {
-  background: #ffffff;
-  border: 3px solid #F1E2D3;
-  border-radius: var(--radius-md);
-  padding: 12px 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  color: #000000;
-}
+  const askAt = async (order, i) => {
+    stopAll()
+    const id = runRef.current
+    triesRef.current = 0
+    setQIdx(i)
+    setHeard('')
+    setHintOn(false)
+    setNote('')
+    setQPhase('asking')
+    const w = order[i]
+    await say(lesson.q, { ja: `${lesson.qJa} こたえて みてね`, mood: 'ask', emoji: w.emoji })
+    if (runRef.current === id) setQPhase('ready')
+  }
 
-.word-card.selected {
-  border-color: var(--color-coral);
-  background: #FFF0E6;
-}
+  const startQuiz = () => {
+    const order = shuffle(selectedWords)
+    setQOrder(order)
+    setScore(0)
+    askAt(order, 0)
+  }
 
-.word-emoji { font-size: 36px; }
-.word-en { font-size: 20px; font-weight: 700; }
-.word-ja { font-size: 13px; }
+  const judge = async (alts, forced = false) => {
+    const w = qOrder[qIdx]
+    if (!w) return
+    const ok = forced || matchesWord(alts, w)
+    const id = runRef.current
+    if (ok) {
+      setQPhase('right')
+      setScore((s) => s + 1)
+      await say(`That's right! ${lesson.a(w)}`, { ja: 'せいかい！ すごいね！', mood: 'cheer' })
+      return
+    }
+    triesRef.current += 1
+    setQPhase('wrong')
+    if (triesRef.current >= 2) {
+      setHintOn(true)
+      await say(`${lesson.a(w)} Say ${w.en}!`, {
+        ja: `こたえは「${w.ja}」だよ。いっしょに いってみよう`,
+        mood: w.mood,
+      })
+    } else {
+      await say('Try again!', { ja: 'もういちど いってみよう', mood: 'ask' })
+    }
+    if (runRef.current === id) setQPhase('ready')
+  }
 
-.mic-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
+  const listen = async () => {
+    // きいている さいちゅうに もういちど おすと、そこで おわる
+    if (qPhase === 'listening') {
+      try {
+        recRef.current && recRef.current.stop()
+      } catch (e) {
+        /* ignore */
+      }
+      return
+    }
+    if (!SR) {
+      setNote('この たんまつでは こえの はんてい が つかえません。いえたら「いえたよ！」を おしてね')
+      return
+    }
+    stopAll() // でぃのの こえを とめてから マイクを つかう
+    setNote('')
+    setHeard('')
+    setQPhase('listening')
+    await sleep(250)
+    const rec = new SR()
+    rec.lang = 'en-US'
+    rec.interimResults = false
+    rec.maxAlternatives = 5
+    recRef.current = rec
+    let got = false
+    rec.onresult = (e) => {
+      got = true
+      const alts = []
+      for (const r of e.results) for (let a = 0; a < r.length; a++) alts.push(r[a].transcript)
+      setHeard(alts[0] || '')
+      judge(alts)
+    }
+    rec.onerror = (e) => {
+      const code = e && e.error
+      if (code === 'not-allowed' || code === 'service-not-allowed') {
+        setNote('まいくが つかえません。せっていで まいくと おんせいにゅうりょくを ゆるしてね。いえたら「いえたよ！」でも すすめるよ')
+      } else if (code === 'no-speech') {
+        setNote('きこえなかったよ。もういちど おはなししてね')
+      } else if (code !== 'aborted') {
+        setNote('うまく きこえなかったよ。もういちど おはなししてね')
+      }
+      setQPhase((p) => (p === 'listening' ? 'ready' : p))
+    }
+    rec.onend = () => {
+      if (!got) setQPhase((p) => (p === 'listening' ? 'ready' : p))
+    }
+    try {
+      rec.start()
+    } catch (e) {
+      setNote('まいくを はじめられませんでした。もういちど おしてね')
+      setQPhase('ready')
+    }
+  }
 
-.mic-btn {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  background: var(--color-coral);
-  font-size: 44px;
-  box-shadow: var(--shadow-soft);
-}
+  const modelVoice = () => {
+    const w = currentWord
+    if (!w) return
+    stopAll()
+    if (qPhase === 'wrong') setQPhase('ready')
+    const text = answerStyle === 'phrase' ? lesson.a(w) : w.en
+    say(text, { ja: `「${w.ja}」だよ`, mood: w.mood, rate: PREFS.rate * 0.85 })
+  }
 
-.mic-btn:disabled {
-  background: #E9D9CC;
-}
+  const nextQuestion = async () => {
+    if (qIdx + 1 < qOrder.length) {
+      askAt(qOrder, qIdx + 1)
+    } else {
+      stopAll()
+      setQPhase('done')
+      setEmoji('')
+      await say('Great job!', { ja: 'よく できました！', mood: 'cheer' })
+    }
+  }
 
-.mic-btn.listening {
-  animation: micPulse 1s ease-in-out infinite;
-}
+  const isBusy = qPhase === 'asking'
 
-@keyframes micPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 138, 101, 0.55); }
-  50% { box-shadow: 0 0 0 18px rgba(255, 138, 101, 0); }
-}
+  return (
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="logo-dot" />
+        <h1>えいごで あそぼう</h1>
+      </header>
 
-.mic-label {
-  font-size: 14px;
-  font-weight: 700;
-  min-height: 20px;
-}
+      <div className="toggle-row">
+        {LESSONS.map((l) => (
+          <button
+            key={l.id}
+            className={lessonId === l.id ? 'active' : ''}
+            onClick={() => switchLesson(l.id)}
+            disabled={playing || isBusy || qPhase === 'listening'}
+          >
+            {l.title}
+          </button>
+        ))}
+      </div>
 
-.score-line {
-  width: 100%;
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  text-align: center;
-}
+      <div className="toggle-row">
+        <button className={sub === 'story' ? 'active' : ''} onClick={() => switchSub('story')}>
+          おはなし
+        </button>
+        <button className={sub === 'quiz' ? 'active' : ''} onClick={() => switchSub('quiz')}>
+          もんだい
+        </button>
+      </div>
 
-@media (min-width: 700px) {
-  .word-grid { grid-template-columns: repeat(4, 1fr); }
-  .dino svg { width: 280px; }
-}
+      {/* ステージ：キャラクターと ふきだし */}
+      <section className="stage">
+        <div className="bubble">
+          {bubble.en && <div className="bubble-en">{bubble.en}</div>}
+          {sub === 'quiz' && answerStyle === 'phrase' && qPhase !== 'idle' && qPhase !== 'done' && (
+            <div className="bubble-en bubble-blank">{lesson.blank}</div>
+          )}
+          {bubble.ja && <div className="bubble-ja">{bubble.ja}</div>}
+        </div>
+        <div className="stage-row">
+          <Dino mood={mood} talking={talking} />
+          {emoji && (
+            <div className="food" key={emoji}>
+              {emoji}
+            </div>
+          )}
+        </div>
+      </section>
 
-@media (prefers-reduced-motion: reduce) {
-  .dino-talk svg, .dino-cheer svg, .food, .mic-btn.listening { animation: none; }
+      {sub === 'story' && (
+        <section className="card">
+          <p className="section-title">でぃのと おはなし</p>
+          <p className="hint-text">でぃのが たべものを みて はなします。きいて まねしてみよう。</p>
+          {playing && (
+            <div className="dots">
+              {Array.from({ length: stepInfo.n }).map((_, i) => (
+                <span key={i} className={`dot${i <= stepInfo.k ? ' on' : ''}`} />
+              ))}
+            </div>
+          )}
+          <div className="button-row">
+            <button className="btn-primary" onClick={playStory} disabled={playing}>
+              {stepInfo.k >= 0 && !playing ? 'もういちど' : 'はじめる'}
+            </button>
+            <button className="btn-secondary" onClick={() => { stopAll(); setMood('happy') }} disabled={!playing}>
+              とめる
+            </button>
+          </div>
+        </section>
+      )}
+
+      {sub === 'quiz' && (
+        <section className="card">
+          <p className="section-title">でぃのの しつもん</p>
+          <div className="toggle-row">
+            <button
+              className={answerStyle === 'word' ? 'active' : ''}
+              onClick={() => setAnswerStyle('word')}
+              disabled={isBusy || qPhase === 'listening'}
+            >
+              たんごで こたえる
+            </button>
+            <button
+              className={answerStyle === 'phrase' ? 'active' : ''}
+              onClick={() => setAnswerStyle('phrase')}
+              disabled={isBusy || qPhase === 'listening'}
+            >
+              ぶんで こたえる
+            </button>
+          </div>
+
+          {(qPhase === 'idle' || qPhase === 'done') && (
+            <div className="button-row">
+              {qPhase === 'done' && <p className="score-line">⭐ {score} / {qOrder.length}　ぜんぶ できたね！</p>}
+              <button className="btn-primary" onClick={startQuiz}>
+                {qPhase === 'done' ? 'もういちど' : 'はじめる'}
+              </button>
+            </div>
+          )}
+
+          {qPhase !== 'idle' && qPhase !== 'done' && (
+            <>
+              <p className="hint-text">
+                {qIdx + 1} / {qOrder.length} もんめ　⭐ {score}
+                {hintOn && currentWord ? `　ヒント：${currentWord.ja}` : ''}
+              </p>
+
+              {qPhase !== 'right' && (
+                <div className="mic-area">
+                  <button
+                    className={`mic-btn${qPhase === 'listening' ? ' listening' : ''}`}
+                    onClick={listen}
+                    aria-label="おはなしする"
+                  >
+                    🎤
+                  </button>
+                  <span className="mic-label">{qPhase === 'listening' ? 'きいているよ…（もういちど おすと おわり）' : 'おして おはなしする'}</span>
+                </div>
+              )}
+
+              {heard && qPhase !== 'right' && <p className="hint-text">きこえた ことば：{heard}</p>}
+              {note && <p className="hint-text">{note}</p>}
+              {!SR && (
+                <p className="hint-text">
+                  この たんまつでは こえの はんてい が つかえません。いえたら「いえたよ！」を おしてね。
+                </p>
+              )}
+
+              <div className="button-row">
+                {qPhase === 'right' ? (
+                  <button className="btn-primary" onClick={nextQuestion}>
+                    つぎへ
+                  </button>
+                ) : (
+                  <>
+                    <button className="btn-secondary" onClick={modelVoice} disabled={isBusy || qPhase === 'listening'}>
+                      おてほんを きく
+                    </button>
+                    <button className="btn-yellow" onClick={() => judge([], true)} disabled={qPhase === 'listening'}>
+                      いえたよ！
+                    </button>
+                  </>
+                )}
+                {hintOn && qPhase !== 'right' && (
+                  <button className="btn-ghost" onClick={nextQuestion}>
+                    つぎへ とばす
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
+      {/* たんご えらび */}
+      <section className="card">
+        <p className="section-title">たんごを えらぶ</p>
+        <p className="hint-text">あそびたい たんごを さわって えらんでね（ひとつは のこります）。</p>
+        <div className="word-grid">
+          {lesson.words.map((w) => (
+            <button
+              key={w.id}
+              className={`word-card${selected.includes(w.id) ? ' selected' : ''}`}
+              onClick={() => toggleWord(w.id)}
+              disabled={playing || isBusy || qPhase === 'listening'}
+            >
+              <span className="word-emoji">{w.emoji}</span>
+              <span className="word-en">{w.en}</span>
+              <span className="word-ja">{w.ja}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="card">
+        <p className="section-title">こえの せってい</p>
+        <div className="toggle-row">
+          {[
+            ['とても ゆっくり', 0.5],
+            ['ゆっくり', 0.65],
+            ['ふつう', 0.85],
+          ].map(([label, r]) => (
+            <button key={r} className={rate === r ? 'active' : ''} onClick={() => changeRate(r)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {voices.length > 0 && (
+          <select className="voice-select" value={voiceURI} onChange={(e) => changeVoice(e.target.value)}>
+            <option value="">おまかせ（おとこの こに ちかい こえ）</option>
+            {voices.map((v) => (
+              <option key={v.voiceURI} value={v.voiceURI}>
+                {v.name}（{v.lang}）
+              </option>
+            ))}
+          </select>
+        )}
+        <div className="button-row">
+          <button
+            className="btn-secondary"
+            onClick={() => say("Hello! I'm Dino!", { ja: 'こえを きいてみよう', mood: 'happy' })}
+          >
+            こえを きいてみる
+          </button>
+        </div>
+        <p className="hint-text">
+          えらべる こえは たんまつに よって ちがいます。ほんものの おとこのこの こえは ないので、おとこの ひとの こえを すこし たかく して つかっています。
+        </p>
+      </section>
+    </div>
+  )
 }
